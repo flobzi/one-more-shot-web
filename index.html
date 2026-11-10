@@ -5,7 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<meta name="mobile-web-app-capable" content="yes">
 		<meta name="apple-mobile-web-app-capable" content="yes">
-		<meta name="theme-color" content="#f4f0e8">
+		<meta name="theme-color" content="#ffe8d0">
 		<title>One More Shot</title>
 		<style>
 html, body, #canvas {
@@ -14,7 +14,19 @@ html, body, #canvas {
 	border: 0;
 }
 
-html, body {
+html, /* PALETTE:BEGIN (written by tools/build_palettes.py) */
+:root {
+	--oms-paper: #ffe8d0;
+	--oms-ink: #1a1030;
+	--oms-muted: #5b3a86;
+	--oms-track: #e8c8c8;
+	--oms-strip: #ffe8d0;
+	--oms-scrim: rgba(26, 16, 48, 0.94);
+	--oms-scrim-ink: #ffe8d0;
+}
+/* PALETTE:END */
+
+body {
 	position: fixed;
 	inset: 0;
 	overflow: hidden;
@@ -28,8 +40,8 @@ html, body {
 }
 
 body {
-	color: #2a2622;
-	background-color: #f4f0e8;
+	color: var(--oms-ink);
+	background-color: var(--oms-paper);
 }
 
 /* Bottom ad strip: always reserved (the game lays itself out above it), filled only
@@ -43,7 +55,7 @@ body {
 	height: calc(var(--oms-ad-h, 0px) + env(safe-area-inset-bottom, 0px));
 	padding-bottom: env(safe-area-inset-bottom, 0px);
 	box-sizing: border-box;
-	background: #f4f0e8;
+	background: var(--oms-strip);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -56,8 +68,8 @@ body {
 	width: 320px;
 	max-width: 92vw;
 	height: 50px;
-	border: 1px dashed #8c8479;
-	color: #8c8479;
+	border: 1px dashed var(--oms-muted);
+	color: var(--oms-muted);
 	font: 600 11px/50px monospace;
 	text-align: center;
 	letter-spacing: 1px;
@@ -71,8 +83,8 @@ body {
 	align-items: center;
 	justify-content: center;
 	gap: 18px;
-	background: rgba(42, 38, 34, 0.94);
-	color: #f4f0e8;
+	background: var(--oms-scrim);
+	color: var(--oms-scrim-ink);
 	font: 600 13px monospace;
 	letter-spacing: 1px;
 	text-align: center;
@@ -82,7 +94,7 @@ body {
 #ad-interstitial .oms-test-box {
 	width: min(80vw, 320px);
 	height: min(60vh, 480px);
-	border: 1px dashed #f4f0e8;
+	border: 1px dashed var(--oms-scrim-ink);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -94,9 +106,9 @@ body {
 	letter-spacing: 1px;
 	padding: 12px 28px;
 	min-height: 44px;
-	border: 1px solid #f4f0e8;
+	border: 1px solid var(--oms-scrim-ink);
 	background: transparent;
-	color: #f4f0e8;
+	color: var(--oms-scrim-ink);
 }
 #ad-interstitial button:disabled { opacity: 0.5; }
 #oms-safe-probe {
@@ -126,7 +138,7 @@ body {
 }
 
 #status {
-	background-color: #f4f0e8;
+	background-color: var(--oms-paper);
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -174,12 +186,12 @@ body {
 	-webkit-appearance: none;
 	appearance: none;
 	border: 0;
-	background: #d8d0c4;
-	color: #2a2622;
+	background: var(--oms-track);
+	color: var(--oms-ink);
 }
-#status-progress::-webkit-progress-bar { background: #d8d0c4; }
-#status-progress::-webkit-progress-value { background: #2a2622; }
-#status-progress::-moz-progress-bar { background: #2a2622; }
+#status-progress::-webkit-progress-bar { background: var(--oms-track); }
+#status-progress::-webkit-progress-value { background: var(--oms-ink); }
+#status-progress::-moz-progress-bar { background: var(--oms-ink); }
 
 #status-notice {
 	background-color: #5b3943;
@@ -198,6 +210,32 @@ body {
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
+	<script>/* PALETTE-JS:BEGIN (written by tools/build_palettes.py) */
+window.OMS_PALETTE = (function () {
+	const CSS = {"sunset": {"paper": "#ffe8d0", "ink": "#1a1030", "muted": "#5b3a86", "track": "#e8c8c8", "strip": "#ffe8d0", "scrim": "rgba(26, 16, 48, 0.94)", "scrim-ink": "#ffe8d0"}, "nes": {"paper": "#fcfcfc", "ink": "#000000", "muted": "#545454", "track": "#bcbcbc", "strip": "#fcfcfc", "scrim": "rgba(0, 0, 0, 0.94)", "scrim-ink": "#fcfcfc"}, "pocket": {"paper": "#9bbc0f", "ink": "#0f380f", "muted": "#306230", "track": "#8bac0f", "strip": "#9bbc0f", "scrim": "rgba(15, 56, 15, 0.94)", "scrim-ink": "#9bbc0f"}, "sepia_orange": {"paper": "#f4f0e8", "ink": "#2a2622", "muted": "#8c8479", "track": "#d8d0c4", "strip": "#f4f0e8", "scrim": "rgba(42, 38, 34, 0.94)", "scrim-ink": "#f4f0e8"}, "sepia": {"paper": "#f4f0e8", "ink": "#2a2622", "muted": "#8c8479", "track": "#d8d0c4", "strip": "#f4f0e8", "scrim": "rgba(42, 38, 34, 0.94)", "scrim-ink": "#f4f0e8"}};
+	const LOGO = {"sunset": "", "nes": "", "pocket": "logo_pocket.png", "sepia_orange": "", "sepia": ""};
+	const DEFAULT = "sunset";
+	function apply(id) {
+		if (!CSS[id]) id = DEFAULT;
+		const root = document.documentElement.style;
+		for (const k in CSS[id]) root.setProperty('--oms-' + k, CSS[id][k]);
+		const meta = document.querySelector('meta[name=theme-color]');
+		if (meta) meta.setAttribute('content', CSS[id].paper);
+		const splash = document.getElementById('status-splash');
+		if (splash && LOGO[id]) splash.src = LOGO[id];
+		try { localStorage.setItem('oms_palette', id); } catch (e) {}
+		return id;
+	}
+	let stored = '';
+	try { stored = localStorage.getItem('oms_palette') || ''; } catch (e) {}
+	if (!CSS[stored]) stored = '';
+	// saved(): the choice as stored at page load ('' = none yet); the game prefers it
+	// over its own user:// copy, which reaches IndexedDB only on the next sync.
+	return { apply: apply, saved: function () { return stored; }, initial: stored || DEFAULT };
+})();
+OMS_PALETTE.apply(OMS_PALETTE.initial);
+document.addEventListener('DOMContentLoaded', function () { OMS_PALETTE.apply(OMS_PALETTE.initial); });
+/* PALETTE-JS:END */</script>
 	</head>
 	<body>
 		<div id="oms-safe-probe"></div>
@@ -226,7 +264,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 		</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":521756,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":768564,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
