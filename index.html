@@ -158,11 +158,28 @@ body {
 	display: none;
 }
 
-#status-progress {
-	bottom: 10%;
-	width: 50%;
-	margin: 0 auto;
+/* Loading page: the logo (boot splash) centred on cream, a thin ink bar under it. */
+#status-splash.fullsize--false {
+	width: min(72vw, 360px);
+	height: auto;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
 }
+#status-progress {
+	bottom: auto;
+	top: calc(50% + min(24vw, 120px) + 14px);   /* just under the logo */
+	width: min(44vw, 200px);
+	height: 4px;
+	margin: 0 auto;
+	-webkit-appearance: none;
+	appearance: none;
+	border: 0;
+	background: #d8d0c4;
+	color: #2a2622;
+}
+#status-progress::-webkit-progress-bar { background: #d8d0c4; }
+#status-progress::-webkit-progress-value { background: #2a2622; }
+#status-progress::-moz-progress-bar { background: #2a2622; }
 
 #status-notice {
 	background-color: #5b3943;
@@ -195,7 +212,7 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
+			<img id="status-splash" class="show-image--true fullsize--false use-filter--false" src="index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
@@ -209,7 +226,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 		</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":421220,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":752844,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
