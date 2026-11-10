@@ -2,7 +2,10 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="theme-color" content="#f4f0e8">
 		<title>One More Shot</title>
 		<style>
 html, body, #canvas {
@@ -11,11 +14,96 @@ html, body, #canvas {
 	border: 0;
 }
 
-body {
-	color: white;
-	background-color: black;
+html, body {
+	position: fixed;
+	inset: 0;
 	overflow: hidden;
-	touch-action: none;
+	overscroll-behavior: none;        /* no pull-to-refresh, no bounce */
+	touch-action: none;               /* no browser pan / pinch-zoom / double-tap zoom */
+	-webkit-user-select: none;
+	user-select: none;                /* no long-press text selection */
+	-webkit-touch-callout: none;      /* no iOS long-press menu */
+	-webkit-tap-highlight-color: transparent;
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	color: #2a2622;
+	background-color: #f4f0e8;
+}
+
+/* Bottom ad strip: always reserved (the game lays itself out above it), filled only
+   on menus / lobby / results. */
+#ad-banner {
+	position: fixed;
+	/* With provider 'none' the strip is only the home-bar safe area. */
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: calc(var(--oms-ad-h, 0px) + env(safe-area-inset-bottom, 0px));
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	box-sizing: border-box;
+	background: #f4f0e8;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2;
+	touch-action: manipulation;
+}
+#ad-banner .oms-ad-slot { visibility: hidden; }
+#ad-banner.on .oms-ad-slot { visibility: visible; }
+.oms-test-ad {
+	width: 320px;
+	max-width: 92vw;
+	height: 50px;
+	border: 1px dashed #8c8479;
+	color: #8c8479;
+	font: 600 11px/50px monospace;
+	text-align: center;
+	letter-spacing: 1px;
+}
+#ad-interstitial {
+	position: fixed;
+	inset: 0;
+	z-index: 5;
+	display: none;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	background: rgba(42, 38, 34, 0.94);
+	color: #f4f0e8;
+	font: 600 13px monospace;
+	letter-spacing: 1px;
+	text-align: center;
+	touch-action: manipulation;
+}
+#ad-interstitial.on { display: flex; }
+#ad-interstitial .oms-test-box {
+	width: min(80vw, 320px);
+	height: min(60vh, 480px);
+	border: 1px dashed #f4f0e8;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	gap: 8px;
+}
+#ad-interstitial button {
+	font: 600 14px monospace;
+	letter-spacing: 1px;
+	padding: 12px 28px;
+	min-height: 44px;
+	border: 1px solid #f4f0e8;
+	background: transparent;
+	color: #f4f0e8;
+}
+#ad-interstitial button:disabled { opacity: 0.5; }
+#oms-safe-probe {
+	position: fixed;
+	visibility: hidden;
+	pointer-events: none;
+	padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 #canvas {
@@ -95,6 +183,9 @@ body {
 
 	</head>
 	<body>
+		<div id="oms-safe-probe"></div>
+		<div id="ad-banner"><div class="oms-ad-slot"></div></div>
+		<div id="ad-interstitial"></div>
 		<canvas id="canvas">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -109,9 +200,16 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
+		<script src="ads.js"></script>
+		<script>
+// No context menu, no gesture zoom (iOS ignores user-scalable=no).
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('dblclick', (e) => e.preventDefault());
+		</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":409996,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":420532,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
