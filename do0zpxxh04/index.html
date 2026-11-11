@@ -244,7 +244,7 @@ window.OMS_PWA = (function () {
 	}
 	if ('serviceWorker' in navigator) {
 		window.addEventListener('load', () => {
-			navigator.serviceWorker.register('sw.js?v=97b11e050528').catch((e) => console.warn('sw', e));
+			navigator.serviceWorker.register('sw.js?v=97b11e050528&d=15').catch((e) => console.warn('sw', e));
 		});
 	}
 	return { mode: mode, prompt: prompt, standalone: standalone };
