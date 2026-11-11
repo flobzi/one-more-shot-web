@@ -207,37 +207,6 @@ body {
 	text-align: center;
 	z-index: 1;
 }
-
-#oms-tap {
-	position: fixed;
-	inset: 0;
-	display: none;
-	justify-content: center;
-	align-items: center;
-	/* Sit under the logo + progress bar on the loading screen. */
-	padding-top: calc(min(14.4vw, 72px) + 28px);
-	box-sizing: border-box;
-	z-index: 4;
-	pointer-events: none;
-	cursor: pointer;
-	background: transparent;
-}
-#oms-tap.on {
-	display: flex;
-	pointer-events: auto;
-}
-#oms-tap.oms-tap-center {
-	padding-top: 0;
-}
-#oms-tap canvas {
-	image-rendering: pixelated;
-	image-rendering: crisp-edges;
-	animation: oms-tap-blink 1.4s steps(1, end) infinite;
-}
-@keyframes oms-tap-blink {
-	0%, 62% { opacity: 1; }
-	63%, 100% { opacity: 0; }
-}
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
@@ -275,7 +244,7 @@ window.OMS_PWA = (function () {
 	}
 	if ('serviceWorker' in navigator) {
 		window.addEventListener('load', () => {
-			navigator.serviceWorker.register('sw.js?v=11a930428a71').catch((e) => console.warn('sw', e));
+			navigator.serviceWorker.register('sw.js?v=9236fe74ed53').catch((e) => console.warn('sw', e));
 		});
 	}
 	return { mode: mode, prompt: prompt, standalone: standalone };
@@ -328,10 +297,11 @@ document.addEventListener('DOMContentLoaded', function () { OMS_PALETTE.apply(OM
 
 
 		<script>/* AUDIO-JS:BEGIN  Unlock Web Audio on the first tap, including the loading
-   screen (browsers keep the AudioContext suspended until a user gesture). A 5x7
-   "TAP TO START" prompt is shown only while the context is still suspended. Leaving
-   the page (tab hide, app switch, lock screen) suspends every context; coming back
-   resumes them. The game polls window.OMS_AUDIO. */
+   screen (browsers keep the AudioContext suspended until a user gesture). There is
+   no prompt or overlay: the first pointer, touch or key is enough, and the game
+   starts the menu music as soon as it is ready. Leaving the page (tab hide, app
+   switch, lock screen) suspends every context; coming back resumes them. The game
+   polls window.OMS_AUDIO. */
 window.OMS_AUDIO = (function () {
 	const Ctor = window.AudioContext || window.webkitAudioContext;
 	const ctxs = [];
@@ -340,19 +310,6 @@ window.OMS_AUDIO = (function () {
 		|| (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 	let unlocked = false;
 	let hidden = false;
-	let autoplayBlocked = null;   // null = not probed yet
-	let prompt = null;
-
-	// The same 5x7 face as game/src/view/pixel_font.gd (TAP TO START only).
-	const GLYPHS = {
-		T: "11111001000010000100001000010000100",
-		A: "01110100011000111111100011000110001",
-		P: "11110100011000111110100001000010000",
-		O: "01110100011000110001100011000101110",
-		S: "01111100001000001110000010000111110",
-		R: "11110100011000111110101001001010001",
-		" ": "00000000000000000000000000000000000",
-	};
 
 	if (Ctor) {
 		class Patched extends Ctor {
@@ -360,7 +317,6 @@ window.OMS_AUDIO = (function () {
 				super(opts);
 				ctxs.push(this);
 				if (unlocked) unlockCtx(this);
-				this.addEventListener('statechange', syncPrompt);
 			}
 		}
 		window.AudioContext = Patched;
@@ -391,7 +347,6 @@ window.OMS_AUDIO = (function () {
 	function onGesture() {
 		unlocked = true;
 		live().forEach(unlockCtx);
-		syncPrompt();
 	}
 	['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
 		window.addEventListener(ev, onGesture, { capture: true, passive: true });
@@ -412,7 +367,6 @@ window.OMS_AUDIO = (function () {
 		} else if (unlocked) {
 			live().forEach(unlockCtx);
 		}
-		syncPrompt();
 	}
 
 	function visHidden() {
@@ -431,98 +385,26 @@ window.OMS_AUDIO = (function () {
 		if (!visHidden()) setHidden(false);
 	});
 
-	function placePrompt() {
-		if (!prompt) return;
-		prompt.classList.toggle('oms-tap-center', !document.getElementById('status'));
-	}
-
-	function drawPrompt() {
-		if (!prompt) return;
-		const canvas = prompt.querySelector('canvas');
-		const text = 'TAP TO START';
-		const W = 5, H = 7, ADV = 6, S = 4;
-		const w = text.length * ADV - 1;
-		canvas.width = w * S;
-		canvas.height = H * S;
-		const g = canvas.getContext('2d');
-		g.clearRect(0, 0, canvas.width, canvas.height);
-		g.fillStyle = (getComputedStyle(document.documentElement).getPropertyValue('--oms-ink') || '#1a1030').trim();
-		let x = 0;
-		for (let i = 0; i < text.length; i++) {
-			const bits = GLYPHS[text[i]] || GLYPHS[' '];
-			for (let row = 0; row < H; row++) {
-				for (let col = 0; col < W; col++) {
-					if (bits[row * W + col] === '1') g.fillRect((x + col) * S, row * S, S, S);
-				}
-			}
-			x += ADV;
-		}
-	}
-
-	function syncPrompt() {
-		if (!prompt) return;
-		placePrompt();
-		// Only once we know autoplay is blocked: never flash the prompt while probing,
-		// and never show it if the browser already allows sound. After a tap, hide it
-		// until a context exists (the engine may not have created one yet); if that
-		// later context is still suspended, show it again.
-		const show = !!Ctor && !hidden && autoplayBlocked === true && !anyRunning()
-			&& (unlocked ? live().length > 0 : true);
-		if (show) {
-			drawPrompt();
-			prompt.classList.add('on');
-			prompt.removeAttribute('hidden');
-		} else {
-			prompt.classList.remove('on');
-			prompt.setAttribute('hidden', '');
-		}
-	}
-
-	function makePrompt() {
-		if (prompt || !document.body) return;
-		prompt = document.createElement('div');
-		prompt.id = 'oms-tap';
-		prompt.setAttribute('hidden', '');
-		prompt.setAttribute('role', 'button');
-		prompt.setAttribute('aria-label', 'TAP TO START');
-		prompt.appendChild(document.createElement('canvas'));
-		document.body.appendChild(prompt);
-		prompt.addEventListener('click', onGesture);
-		placePrompt();
-		const status = document.getElementById('status');
-		if (status && window.MutationObserver) {
-			new MutationObserver(placePrompt).observe(status.parentNode, { childList: true });
-		}
-	}
-
+	// If the browser already allows sound, mark unlocked so the game can start
+	// the menu music with no extra tap.
 	function probe() {
-		if (!Ctor) { autoplayBlocked = false; syncPrompt(); return; }
+		if (!Ctor) return;
 		let ctx;
-		try { ctx = new (window.AudioContext || Ctor)(); } catch (e) {
-			autoplayBlocked = true;
-			syncPrompt();
-			return;
-		}
+		try { ctx = new (window.AudioContext || Ctor)(); } catch (e) { return; }
 		const finish = function () {
-			autoplayBlocked = ctx.state !== 'running';
-			if (!autoplayBlocked) unlocked = true;
+			if (ctx.state === 'running') unlocked = true;
 			try { ctx.close(); } catch (e) {}
 			const i = ctxs.indexOf(ctx);
 			if (i >= 0) ctxs.splice(i, 1);
-			syncPrompt();
 		};
 		const p = ctx.resume && ctx.resume();
 		if (p && p.then) p.then(finish).catch(finish);
 		else finish();
-		setTimeout(function () { if (autoplayBlocked === null) finish(); }, 300);
+		setTimeout(function () { if (ctxs.indexOf(ctx) >= 0) finish(); }, 300);
 	}
 
-	function boot() {
-		makePrompt();
-		probe();
-	}
-	if (document.body) boot();
-	else document.addEventListener('DOMContentLoaded', boot);
+	if (document.body) probe();
+	else document.addEventListener('DOMContentLoaded', probe);
 
 	return {
 		ready: function () { return unlocked || anyRunning(); },
@@ -530,14 +412,6 @@ window.OMS_AUDIO = (function () {
 		// tests
 		_ctxs: ctxs,
 		_setHidden: setHidden,
-		_sync: syncPrompt,
-		_forceBlocked: function () {
-			unlocked = false;
-			autoplayBlocked = true;
-			var ctx = live()[0] || new (window.AudioContext || Ctor)();
-			return (ctx.suspend ? ctx.suspend() : Promise.resolve()).catch(function () {})
-				.then(function () { syncPrompt(); return ctx.state; });
-		},
 	};
 })();
 /* AUDIO-JS:END */</script>
@@ -602,7 +476,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 		</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":7086640,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":7086800,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
