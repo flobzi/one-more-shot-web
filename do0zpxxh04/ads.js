@@ -1,6 +1,7 @@
 /*
  * One More Shot: web ad layer (provider-agnostic). The game calls, via JavaScriptBridge:
  *   OMS_ADS.insets()        -> {top, left, right, bottom, viewH} CSS px to keep clear (notch)
+ *                              (the page's own OMS_PAGE.insets(); kept here for older shells)
  *   OMS_ADS.banner(on)      bottom banner may show (menus/lobby/results) or must hide (play)
  *   OMS_ADS.breakPoint(k)   'match_end' | 'menu': a full-screen ad MAY show here
  *   OMS_ADS.showing()       true while a full-screen ad is up (the game freezes)
@@ -12,34 +13,55 @@
  *   adsenseBannerSlot: the numeric ad-unit ID of a 320x50 display unit for the banner
  *   adsenseTestMode:   true while testing (H5 Games Ads test ads), false when approved
  * Full-screen ads use Google's H5 Games Ads (adBreak / adConfig), which needs the site
- * approved for H5 Games Ads in your AdSense account. Until then keep provider 'test'
- * (labelled placeholders) or 'none' (no ads, no strip).
- * URL overrides for checking: ?ads=none|test|adsense  ?adgap=0 (no frequency cap)
- *   ?adnow=1 (no cap, no first-match rule: the next menu return shows one)
+ * approved for H5 Games Ads in your AdSense account. Until then keep provider 'none'
+ * (no ads, no strip). 'test' shows labelled placeholders and only runs on localhost.
+ *
+ * Launch policy:
+ *   - at most ONE full-screen ad per session (interstitialMaxPerSession),
+ *   - never before the first finished match,
+ *   - no banner unless `banner: true`.
+ * The game decides WHEN a break is offered (after the player leaves a result, see
+ * ads.gd); this file only decides whether one is due.
+ * URL overrides for checking, honoured on localhost only: ?ads=none|test|adsense
+ *   ?adbanner=1 (banner on)  ?adgap=0 (no minimum gap)  ?admax=N (ads per session)
+ *   ?adnow=1 (no gap, no first-match rule: the next break shows one)
  * ---------------------------------------------------------------------------------
  */
 window.OMS_ADS_CONFIG = Object.assign({
-	provider: 'test',               // 'none' | 'test' | 'adsense'
+	provider: 'none',               // 'none' | 'test' (localhost only) | 'adsense'
 	adsenseClient: '',              // 'ca-pub-XXXXXXXXXXXXXXXX'
 	adsenseBannerSlot: '',          // e.g. '1234567890'
 	adsenseTestMode: true,
+	banner: false,                  // bottom banner on menus / lobby / results
 	bannerHeight: 56,               // CSS px reserved at the bottom for a 320x50 banner
-	interstitialMinGapSec: 120,     // at most one full-screen ad every 2 minutes ...
+	interstitialMaxPerSession: 1,   // at most this many full-screen ads per session ...
+	interstitialMinGapSec: 120,     // ... never closer together than this ...
 	interstitialAfterMatches: 1,    // ... and none before the first finished match
 }, window.OMS_ADS_CONFIG || {});
 
 (function () {
 	const cfg = window.OMS_ADS_CONFIG;
-	const q = new URLSearchParams(window.location.search);
-	if (q.has('ads')) cfg.provider = q.get('ads');
-	if (q.has('adgap')) cfg.interstitialMinGapSec = Number(q.get('adgap')) || 0;
-	if (q.has('adnow')) { cfg.interstitialMinGapSec = 0; cfg.interstitialAfterMatches = 0; }   // placement check
-	if (cfg.provider === 'adsense' && !cfg.adsenseClient) cfg.provider = 'test';   // never run with a made-up ID
+	// Placement overrides are a development aid: honoured on localhost only, so nobody
+	// can switch ads on, off or into test mode on the live site with a query string.
+	const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+	if (local) {
+		const q = new URLSearchParams(window.location.search);
+		if (q.has('ads')) cfg.provider = q.get('ads');
+		if (q.has('adbanner')) cfg.banner = true;
+		if (q.has('adgap')) cfg.interstitialMinGapSec = Number(q.get('adgap')) || 0;
+		if (q.has('admax')) cfg.interstitialMaxPerSession = Number(q.get('admax')) || 0;
+		if (q.has('adnow')) { cfg.interstitialMinGapSec = 0; cfg.interstitialAfterMatches = 0; }   // placement check
+	}
+	if (['none', 'test', 'adsense'].indexOf(cfg.provider) < 0) cfg.provider = 'none';
+	if (cfg.provider === 'test' && !local) cfg.provider = 'none';                  // placeholders never ship
+	if (cfg.provider === 'adsense' && !cfg.adsenseClient) cfg.provider = 'none';   // never run with a made-up ID
 	const on = cfg.provider !== 'none';
-	document.documentElement.style.setProperty('--oms-ad-h', (on ? cfg.bannerHeight : 0) + 'px');
+	const bannerOn = on && !!cfg.banner;
+	document.documentElement.style.setProperty('--oms-ad-h', (bannerOn ? cfg.bannerHeight : 0) + 'px');
 
 	let showing = false;
 	let matches = 0;
+	let shown = 0;                    // full-screen ads shown this session
 	let lastAd = performance.now();   // the cap also counts from the start of the session
 	let bannerMade = false;
 
@@ -94,9 +116,12 @@ window.OMS_ADS_CONFIG = Object.assign({
 		});
 	}
 
-	// The game canvas fills the screen above the banner strip (canvas resize policy
-	// "None" in the export: this page sizes it). The court is never under the banner.
+	// The canvas size and the safe-area insets are the page's own job (shell.html,
+	// window.OMS_PAGE), so the game fills the screen even when this file is blocked.
+	// Only a shell from before that still relies on the copies below.
+	const page = window.OMS_PAGE || null;
 	function fitCanvas() {
+		if (page) { page.fitCanvas(); return; }
 		const c = $('canvas');
 		if (!c) return;
 		const dpr = window.devicePixelRatio || 1;
@@ -115,16 +140,19 @@ window.OMS_ADS_CONFIG = Object.assign({
 			c.height = ph;
 		}
 	}
-	window.addEventListener('resize', fitCanvas);
-	window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 120));
-	if (window.visualViewport) window.visualViewport.addEventListener('resize', fitCanvas);
-	document.addEventListener('DOMContentLoaded', fitCanvas);
-	fitCanvas();
-	setInterval(fitCanvas, 500);   // cheap safety net (browser UI bars sliding in and out)
+	if (!page) {
+		window.addEventListener('resize', fitCanvas);
+		window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 120));
+		if (window.visualViewport) window.visualViewport.addEventListener('resize', fitCanvas);
+		document.addEventListener('DOMContentLoaded', fitCanvas);
+		setInterval(fitCanvas, 500);   // cheap safety net (browser UI bars sliding in and out)
+	}
+	fitCanvas();   // the banner strip's height was just set above
 
 	window.OMS_ADS = {
 		fitCanvas,
 		insets() {
+			if (page) return page.insets();
 			const p = $('oms-safe-probe');
 			const cs = p ? getComputedStyle(p) : null;
 			const px = (v) => (cs ? parseFloat(cs[v]) || 0 : 0);
@@ -135,7 +163,7 @@ window.OMS_ADS_CONFIG = Object.assign({
 			};
 		},
 		banner(visible) {
-			if (!on) return;
+			if (!bannerOn) return;
 			makeBanner();
 			const b = $('ad-banner');
 			if (b) b.classList.toggle('on', !!visible);
@@ -143,10 +171,12 @@ window.OMS_ADS_CONFIG = Object.assign({
 		breakPoint(kind) {
 			if (!on || showing) return;
 			if (kind === 'match_end') matches += 1;
+			if (shown >= cfg.interstitialMaxPerSession) return;
 			if (matches < cfg.interstitialAfterMatches) return;
 			const now = performance.now();
 			if (now - lastAd < cfg.interstitialMinGapSec * 1000) return;
 			lastAd = now;
+			shown += 1;
 			if (cfg.provider === 'test') {
 				testInterstitial();
 			} else if (cfg.provider === 'adsense') {
