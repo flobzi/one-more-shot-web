@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+		<meta name="robots" content="noindex, nofollow">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="theme-color" content="#ffe8d0">
+		<title>One More Shot</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+html, /* PALETTE:BEGIN (written by tools/build_palettes.py) */
+:root {
+	--oms-paper: #ffe8d0;
+	--oms-ink: #1a1030;
+	--oms-muted: #5b3a86;
+	--oms-track: #e8c8c8;
+	--oms-strip: #ffe8d0;
+	--oms-scrim: rgba(26, 16, 48, 0.94);
+	--oms-scrim-ink: #ffe8d0;
+}
+/* PALETTE:END */
+
+body {
+	position: fixed;
+	inset: 0;
+	overflow: hidden;
+	overscroll-behavior: none;        /* no pull-to-refresh, no bounce */
+	touch-action: none;               /* no browser pan / pinch-zoom / double-tap zoom */
+	-webkit-user-select: none;
+	user-select: none;                /* no long-press text selection */
+	-webkit-touch-callout: none;      /* no iOS long-press menu */
+	-webkit-tap-highlight-color: transparent;
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	color: var(--oms-ink);
+	background-color: var(--oms-paper);
+}
+
+/* Bottom ad strip: always reserved (the game lays itself out above it), filled only
+   on menus / lobby / results. */
+#ad-banner {
+	position: fixed;
+	/* With provider 'none' the strip is only the home-bar safe area. */
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: calc(var(--oms-ad-h, 0px) + env(safe-area-inset-bottom, 0px));
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	box-sizing: border-box;
+	background: var(--oms-strip);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2;
+	touch-action: manipulation;
+}
+#ad-banner .oms-ad-slot { visibility: hidden; }
+#ad-banner.on .oms-ad-slot { visibility: visible; }
+.oms-test-ad {
+	width: 320px;
+	max-width: 92vw;
+	height: 50px;
+	border: 1px dashed var(--oms-muted);
+	color: var(--oms-muted);
+	font: 600 11px/50px monospace;
+	text-align: center;
+	letter-spacing: 1px;
+}
+#ad-interstitial {
+	position: fixed;
+	inset: 0;
+	z-index: 5;
+	display: none;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	background: var(--oms-scrim);
+	color: var(--oms-scrim-ink);
+	font: 600 13px monospace;
+	letter-spacing: 1px;
+	text-align: center;
+	touch-action: manipulation;
+}
+#ad-interstitial.on { display: flex; }
+#ad-interstitial .oms-test-box {
+	width: min(80vw, 320px);
+	height: min(60vh, 480px);
+	border: 1px dashed var(--oms-scrim-ink);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	gap: 8px;
+}
+#ad-interstitial button {
+	font: 600 14px monospace;
+	letter-spacing: 1px;
+	padding: 12px 28px;
+	min-height: 44px;
+	border: 1px solid var(--oms-scrim-ink);
+	background: transparent;
+	color: var(--oms-scrim-ink);
+}
+#ad-interstitial button:disabled { opacity: 0.5; }
+#oms-safe-probe {
+	position: fixed;
+	visibility: hidden;
+	pointer-events: none;
+	padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: var(--oms-paper);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+/* Loading page: the logo (boot splash) centred on cream, a thin ink bar under it. */
+#status-splash.fullsize--false {
+	width: min(43vw, 216px);
+	height: auto;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+}
+#status-progress {
+	bottom: auto;
+	top: calc(50% + min(14.4vw, 72px) + 12px);   /* just under the logo */
+	width: min(26vw, 120px);
+	height: 4px;
+	margin: 0 auto;
+	-webkit-appearance: none;
+	appearance: none;
+	border: 0;
+	background: var(--oms-track);
+	color: var(--oms-ink);
+}
+#status-progress::-webkit-progress-bar { background: var(--oms-track); }
+#status-progress::-webkit-progress-value { background: var(--oms-ink); }
+#status-progress::-moz-progress-bar { background: var(--oms-ink); }
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+		<link rel="manifest" href="manifest.webmanifest">
+		<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+		<meta name="apple-mobile-web-app-title" content="One More Shot">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<script>/* PWA: home-screen install (INSTALL button on the main menu) */
+window.OMS_PWA = (function () {
+	let deferred = null;
+	let installed = false;
+	const ua = navigator.userAgent || '';
+	const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	const mobile = ios || /Android|Mobi/i.test(ua);
+	function standalone() {
+		const mm = (q) => window.matchMedia && window.matchMedia(q).matches;
+		return mm('(display-mode: standalone)') || mm('(display-mode: fullscreen)') || navigator.standalone === true;
+	}
+	window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; });
+	window.addEventListener('appinstalled', () => { installed = true; deferred = null; });
+	// '' = no button; 'prompt' = Android/Chrome install prompt ready; 'ios' = show the steps.
+	function mode() {
+		if (installed || standalone() || !mobile) return '';
+		if (ios) return 'ios';
+		return deferred ? 'prompt' : '';
+	}
+	function prompt() {
+		if (!deferred) return 'none';
+		const d = deferred;
+		deferred = null;
+		d.prompt();
+		d.userChoice.then((c) => { if (c && c.outcome === 'accepted') installed = true; }).catch(() => {});
+		return 'shown';
+	}
+	if ('serviceWorker' in navigator) {
+		window.addEventListener('load', () => {
+			navigator.serviceWorker.register('sw.js?v=6834716f4f9d').catch((e) => console.warn('sw', e));
+		});
+	}
+	return { mode: mode, prompt: prompt, standalone: standalone };
+})();
+	</script>
+	<script>/* PALETTE-JS:BEGIN (written by tools/build_palettes.py) */
+window.OMS_PALETTE = (function () {
+	const CSS = {"sunset": {"paper": "#ffe8d0", "ink": "#1a1030", "muted": "#5b3a86", "track": "#e8c8c8", "strip": "#ffe8d0", "scrim": "rgba(26, 16, 48, 0.94)", "scrim-ink": "#ffe8d0"}, "nes": {"paper": "#fcfcfc", "ink": "#000000", "muted": "#545454", "track": "#bcbcbc", "strip": "#fcfcfc", "scrim": "rgba(0, 0, 0, 0.94)", "scrim-ink": "#fcfcfc"}, "pocket": {"paper": "#9bbc0f", "ink": "#0f380f", "muted": "#306230", "track": "#8bac0f", "strip": "#9bbc0f", "scrim": "rgba(15, 56, 15, 0.94)", "scrim-ink": "#9bbc0f"}, "sepia_orange": {"paper": "#f4f0e8", "ink": "#2a2622", "muted": "#8c8479", "track": "#d8d0c4", "strip": "#f4f0e8", "scrim": "rgba(42, 38, 34, 0.94)", "scrim-ink": "#f4f0e8"}, "sepia": {"paper": "#f4f0e8", "ink": "#2a2622", "muted": "#8c8479", "track": "#d8d0c4", "strip": "#f4f0e8", "scrim": "rgba(42, 38, 34, 0.94)", "scrim-ink": "#f4f0e8"}, "night_court": {"paper": "#eef4ff", "ink": "#040a14", "muted": "#2a4060", "track": "#244268", "strip": "#08142a", "scrim": "rgba(4, 10, 20, 0.94)", "scrim-ink": "#eef4ff"}};
+	const LOGO = {"sunset": "", "nes": "", "pocket": "logo_pocket.png", "sepia_orange": "", "sepia": "", "night_court": ""};
+	const DEFAULT = "sunset";
+	function apply(id) {
+		if (!CSS[id]) id = DEFAULT;
+		const root = document.documentElement.style;
+		for (const k in CSS[id]) root.setProperty('--oms-' + k, CSS[id][k]);
+		const meta = document.querySelector('meta[name=theme-color]');
+		if (meta) meta.setAttribute('content', CSS[id].paper);
+		const splash = document.getElementById('status-splash');
+		if (splash && LOGO[id]) splash.src = LOGO[id];
+		try { localStorage.setItem('oms_palette', id); } catch (e) {}
+		return id;
+	}
+	let stored = '';
+	try { stored = localStorage.getItem('oms_palette') || ''; } catch (e) {}
+	if (!CSS[stored]) stored = '';
+	// saved(): the choice as stored at page load ('' = none yet); the game prefers it
+	// over its own user:// copy, which reaches IndexedDB only on the next sync.
+	return { apply: apply, saved: function () { return stored; }, initial: stored || DEFAULT };
+})();
+OMS_PALETTE.apply(OMS_PALETTE.initial);
+document.addEventListener('DOMContentLoaded', function () { OMS_PALETTE.apply(OMS_PALETTE.initial); });
+/* PALETTE-JS:END */</script>
+	</head>
+	<body>
+		<div id="oms-safe-probe"></div>
+		<div id="ad-banner"><div class="oms-ad-slot"></div></div>
+		<div id="ad-interstitial"></div>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--true fullsize--false use-filter--false" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+
+		<script>/* AUDIO-JS:BEGIN  Unlock Web Audio on the first tap, including the loading
+   screen (browsers keep the AudioContext suspended until a user gesture). There is
+   no prompt or overlay: the first pointer, touch or key is enough, and the game
+   starts the menu music as soon as it is ready. Leaving the page (tab hide, app
+   switch, lock screen) suspends every context; coming back resumes them. The game
+   polls window.OMS_AUDIO. */
+window.OMS_AUDIO = (function () {
+	const Ctor = window.AudioContext || window.webkitAudioContext;
+	const ctxs = [];
+	const ua = navigator.userAgent || '';
+	const mobile = /iPhone|iPad|iPod|Android|Mobi/i.test(ua)
+		|| (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	let unlocked = false;
+	let hidden = false;
+
+	if (Ctor) {
+		class Patched extends Ctor {
+			constructor(opts) {
+				super(opts);
+				ctxs.push(this);
+				if (unlocked) unlockCtx(this);
+			}
+		}
+		window.AudioContext = Patched;
+		if (window.webkitAudioContext) window.webkitAudioContext = Patched;
+	}
+
+	function live() {
+		return ctxs.filter((c) => c && c.state !== 'closed');
+	}
+
+	function anyRunning() {
+		return live().some((c) => c.state === 'running');
+	}
+
+	function unlockCtx(ctx) {
+		if (!ctx || ctx.state === 'closed') return;
+		const resume = ctx.resume && ctx.resume();
+		if (resume && resume.catch) resume.catch(function () {});
+		try {
+			const buf = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+			const src = ctx.createBufferSource();
+			src.buffer = buf;
+			src.connect(ctx.destination);
+			src.start(0);
+		} catch (e) {}
+	}
+
+	function onGesture() {
+		unlocked = true;
+		live().forEach(unlockCtx);
+	}
+	['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
+		window.addEventListener(ev, onGesture, { capture: true, passive: true });
+	});
+
+	function inPageFocus() {
+		const ae = document.activeElement;
+		if (!ae || ae === document.body || ae === document.documentElement) return false;
+		if (ae.tagName === 'IFRAME') return true;
+		return !!(ae.closest && (ae.closest('#ad-banner') || ae.closest('#ad-interstitial')));
+	}
+
+	function setHidden(on) {
+		if (hidden === on) return;
+		hidden = on;
+		if (on) {
+			live().forEach((c) => { if (c.state === 'running' && c.suspend) c.suspend().catch(function () {}); });
+		} else if (unlocked) {
+			live().forEach(unlockCtx);
+		}
+	}
+
+	function visHidden() {
+		return !!(document.hidden || document.visibilityState === 'hidden'
+			|| document.webkitHidden);
+	}
+
+	document.addEventListener('visibilitychange', function () { setHidden(visHidden()); });
+	document.addEventListener('webkitvisibilitychange', function () { setHidden(visHidden()); });
+	window.addEventListener('pagehide', function () { setHidden(true); });
+	window.addEventListener('pageshow', function () { setHidden(visHidden()); });
+	window.addEventListener('blur', function () {
+		if (mobile && !inPageFocus()) setHidden(true);
+	});
+	window.addEventListener('focus', function () {
+		if (!visHidden()) setHidden(false);
+	});
+
+	// If the browser already allows sound, mark unlocked so the game can start
+	// the menu music with no extra tap.
+	function probe() {
+		if (!Ctor) return;
+		let ctx;
+		try { ctx = new (window.AudioContext || Ctor)(); } catch (e) { return; }
+		const finish = function () {
+			if (ctx.state === 'running') unlocked = true;
+			try { ctx.close(); } catch (e) {}
+			const i = ctxs.indexOf(ctx);
+			if (i >= 0) ctxs.splice(i, 1);
+		};
+		const p = ctx.resume && ctx.resume();
+		if (p && p.then) p.then(finish).catch(finish);
+		else finish();
+		setTimeout(function () { if (ctxs.indexOf(ctx) >= 0) finish(); }, 300);
+	}
+
+	if (document.body) probe();
+	else document.addEventListener('DOMContentLoaded', probe);
+
+	return {
+		ready: function () { return unlocked || anyRunning(); },
+		get hidden() { return hidden; },
+		// tests
+		_ctxs: ctxs,
+		_setHidden: setHidden,
+	};
+})();
+/* AUDIO-JS:END */</script>
+
+		<script>/* PAGE-JS:BEGIN  The page's own layout: the canvas size and the safe-area insets.
+   Inline on purpose. It used to live in ads.js, and a file with that name is exactly
+   what content blockers drop: the game then ran in a 300x150 box with no notch
+   insets. Whatever happens to ads.js, the game fills the screen. */
+(function () {
+	function $(id) { return document.getElementById(id); }
+
+	// The canvas fills the screen above the banner strip (canvas resize policy "None"
+	// in the export: this page sizes it). The court is never under the banner.
+	function fitCanvas() {
+		const c = $('canvas');
+		if (!c) return;
+		const dpr = window.devicePixelRatio || 1;
+		const strip = $('ad-banner') ? $('ad-banner').getBoundingClientRect().height : 0;
+		const w = window.innerWidth;
+		const h = Math.max(1, window.innerHeight - strip);
+		c.style.position = 'absolute';
+		c.style.left = '0px';
+		c.style.top = '0px';
+		c.style.width = w + 'px';
+		c.style.height = h + 'px';
+		const pw = Math.round(w * dpr);
+		const ph = Math.round(h * dpr);
+		if (c.width !== pw || c.height !== ph) {
+			c.width = pw;
+			c.height = ph;
+		}
+	}
+	window.addEventListener('resize', fitCanvas);
+	window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 120));
+	if (window.visualViewport) window.visualViewport.addEventListener('resize', fitCanvas);
+	document.addEventListener('DOMContentLoaded', fitCanvas);
+	fitCanvas();
+	setInterval(fitCanvas, 500);   // cheap safety net (browser UI bars sliding in and out)
+
+	window.OMS_PAGE = {
+		fitCanvas,
+		// {top, left, right, bottom, viewH} CSS px to keep clear (notch, rounded corners).
+		insets() {
+			const p = $('oms-safe-probe');
+			const cs = p ? getComputedStyle(p) : null;
+			const px = (v) => (cs ? parseFloat(cs[v]) || 0 : 0);
+			return {
+				top: px('paddingTop'), left: px('paddingLeft'), right: px('paddingRight'),
+				bottom: 0,   // the banner strip and home bar are outside the canvas
+				viewH: $('canvas') ? $('canvas').getBoundingClientRect().height : window.innerHeight,
+			};
+		},
+	};
+}());
+/* PAGE-JS:END */</script>
+		<script src="ads.js"></script>
+		<script>
+// No context menu, no gesture zoom (iOS ignores user-scalable=no).
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('dblclick', (e) => e.preventDefault());
+		</script>
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":16665124,"index.wasm":37695054},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>
+
