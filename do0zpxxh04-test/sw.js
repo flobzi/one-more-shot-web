@@ -2,7 +2,7 @@
 // Network first for every same-origin file, so a deploy is picked up on the next load
 // and a stale index.pck is never served while online; the cache (named after the build
 // md5) is only the offline fallback. Old builds' caches are deleted on activate.
-const BUILD = '6c1a7edd2911';
+const BUILD = '05cf8275ebf9';
 const CACHE = 'oms-' + BUILD;
 
 self.addEventListener('install', () => self.skipWaiting());
